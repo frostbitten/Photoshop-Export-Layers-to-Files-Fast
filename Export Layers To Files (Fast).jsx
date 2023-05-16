@@ -355,6 +355,7 @@ var DEFAULT_SETTINGS = {
     fileType: app.stringIDToTypeID("fileType"),
     groupsAsFolders: app.stringIDToTypeID("groupsAsFolders"),
     ignoreLayers: app.stringIDToTypeID('ignoreLayers'),
+    ignoreGroups: app.stringIDToTypeID('ignoreGroups'),
     ignoreLayersString: app.stringIDToTypeID('ignoreLayersString'),
     jpgQuality: app.stringIDToTypeID('jpgQuality'),
     jpgMatte: app.stringIDToTypeID('jpgMatte'),
@@ -531,6 +532,16 @@ function main() {
     }
 }
 
+function shouldIgnoreLayer(layer, ignoreString) {
+    if (layer.name.indexOf(ignoreString) === 0) {
+        return true;
+    }
+    if (prefs.ignoreGroups && layer.parent && layer.parent.typename === 'LayerSet') {
+        return shouldIgnoreLayer(layer.parent, ignoreString);
+    }
+    return false;
+}
+
 function exportLayers(exportLayerTarget, progressBarWindow) {
     var retVal = {
         count: 0,
@@ -646,7 +657,8 @@ function exportLayers(exportLayerTarget, progressBarWindow) {
             // Ignore layers that have are prefixed with ignoreLayersString
             if (prefs.ignoreLayers 
                 && prefs.ignoreLayersString.length > 0 
-                && layer.name.indexOf(prefs.ignoreLayersString) === 0) continue;
+                && shouldIgnoreLayer(layer, prefs.ignoreLayersString)
+				) continue;
 
             var fileName;
             switch (prefs.nameFiles) {
@@ -1221,11 +1233,14 @@ function showDialog() {
     fields.cbVisibleOnly.enabled = (visibleLayerCount > 0);
     fields.cbVisibleOnly.value = prefs.visibleOnly;
     fields.cbIgnorePrefix.value = prefs.ignoreLayers;
+    fields.cbIgnoreGroupsPrefix.value = prefs.ignoreGroups;
     fields.txtIgnorePrefix.enabled = prefs.ignoreLayers;
+    fields.cbIgnoreGroupsPrefix.enabled = prefs.ignoreLayers;
 
     fields.txtIgnorePrefix.text = prefs.ignoreLayersString;
     fields.cbIgnorePrefix.onClick = function() {
         fields.txtIgnorePrefix.enabled = this.value;
+		fields.cbIgnoreGroupsPrefix.enabled = this.value;
     };
 
 
@@ -1565,6 +1580,7 @@ function saveSettings(dialog) {
     desc.putString(DEFAULT_SETTINGS.fileType, fields.tabpnlExportOptions.selection.text);
     desc.putBoolean(DEFAULT_SETTINGS.groupsAsFolders, fields.cbGroupsAsFolders.value);
     desc.putBoolean(DEFAULT_SETTINGS.ignoreLayers, fields.cbIgnorePrefix.value);
+    desc.putBoolean(DEFAULT_SETTINGS.ignoreGroups, fields.cbIgnoreGroupsPrefix.value);
     desc.putString(DEFAULT_SETTINGS.ignoreLayersString, fields.txtIgnorePrefix.text);
 
     desc.putInteger(DEFAULT_SETTINGS.jpgQuality, fields.sldrJpgQuality.value);
@@ -1742,6 +1758,7 @@ function getSettings(formatOpts) {
             fileType: desc.getString(DEFAULT_SETTINGS.fileType),
             groupsAsFolders: desc.getBoolean(DEFAULT_SETTINGS.groupsAsFolders),
             ignoreLayers: desc.getBoolean(DEFAULT_SETTINGS.ignoreLayers),
+            ignoreGroups: desc.getBoolean(DEFAULT_SETTINGS.ignoreGroups),
             ignoreLayersString: desc.getString(DEFAULT_SETTINGS.ignoreLayersString),
             jpgIcc: desc.getBoolean(DEFAULT_SETTINGS.jpgIcc),
             jpgMatte: desc.getInteger(DEFAULT_SETTINGS.jpgMatte),
@@ -2470,6 +2487,7 @@ function getDialogFields(dialog) {
         radioSelected: dialog.findElement("radioSelected"),
         cbVisibleOnly: dialog.findElement("cbVisibleOnly"),
         cbIgnorePrefix: dialog.findElement("cbIgnorePrefix"),
+        cbIgnoreGroupsPrefix: dialog.findElement("cbIgnoreGroupsPrefix"),
         txtIgnorePrefix: dialog.findElement("txtIgnorePrefix"),
 
         ddNameAs: dialog.findElement("ddNameAs"),
@@ -2668,6 +2686,10 @@ function makeMainDialog() {
     txtIgnorePrefix.helpTip = "The prefix to match against"; 
     txtIgnorePrefix.text = "!"; 
     txtIgnorePrefix.preferredSize.width = 31; 
+
+    var cbIgnoreGroupsPrefix = grpIgnorePrefix.add("checkbox", undefined, undefined, {name: "cbIgnoreGroupsPrefix"}); 
+    cbIgnoreGroupsPrefix.helpTip = "Also ignore a group and its contents if it starts with the prefix."; 
+    cbIgnoreGroupsPrefix.text = "Also ignore matching groups."; 
 
     // PNLNAMEFILES
     // ============
